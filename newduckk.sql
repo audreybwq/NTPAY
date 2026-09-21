@@ -74,5 +74,4 @@ WHERE ao.currency = 'NPR'
             -- 'oreo5897@gmail.com',
             -- 'imking666@gmail.com'
         )
-    ) and merchant_code not in ('S0001', 'TEST0001', 'SYS0001')
-order by ao.created_at desc;
+    ) and merchant_code not in ('S0001', 'TEST0001', 'SYS0001');
