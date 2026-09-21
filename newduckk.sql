@@ -9,6 +9,11 @@ SELECT
     ao.status,
     ao.remark,
     ao.error_message,
+    ao.sender_name, 
+    ao.sender_email,
+    ao.sender_account_number,
+    ao.created_at + INTERVAL '5 hours 45 minutes' AS converted_created_at,
+    ao.end_time + INTERVAL '5 hours 45 minutes' AS converted_end_time,
     -- Duration in seconds; NULL when either timestamp is missing.
     date_diff('second', ao.created_at, ao.end_time) AS duration,
     CASE
@@ -27,7 +32,7 @@ SELECT
             'IME77', 'NEPAL8', 'HIMA8', 'JEERAJ',
             'ROYALNEPA', 'NEPALWIN', '95NP', 'DSTGAMING',
             'KYASINO88', 'KTM', 'NB8', 'PAYPRO', 'TAB66',
-            '1HIMA', '8KUBER'
+            '1HIMA', '8KUBER','NK101'
         ) THEN 'TIGER'
         WHEN UPPER(TRIM(m.code)) = 'TKASH' THEN 'TKASH'
         WHEN UPPER(TRIM(m.code)) IN (
@@ -55,18 +60,18 @@ FROM ducklake.ingest_ntpay.automation_operations AS ao
 LEFT JOIN ducklake.ingest_ntpay.merchants AS m
     ON ao.merchant_id = m.id
 WHERE ao.currency = 'NPR'
-    -- Keep missing emails; exclude the listed test emails regardless of case/spaces.
     AND (
         ao.sender_email IS NULL
         OR LOWER(TRIM(ao.sender_email)) NOT IN (
-            'luck1234@gmail.com',
-            'ming123@gmail.com',
+            -- 'luck1234@gmail.com',
+            -- 'ming123@gmail.com',
             'test1123@gmail.com',
-            'oreo5833@gmail.com',
+            -- 'oreo5833@gmail.com',
             'bottesting12@gmail.com',
-            'testacc1@gmail.com',
-            'winwin01@gmail.com',
-            'oreo5897@gmail.com',
-            'imking666@gmail.com'
+            'testacc1@gmail.com'
+            -- 'winwin01@gmail.com',
+            -- 'oreo5897@gmail.com',
+            -- 'imking666@gmail.com'
         )
-    );
+    ) and merchant_code not in ('S0001', 'TEST0001', 'SYS0001')
+order by ao.created_at desc;

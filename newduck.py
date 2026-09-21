@@ -73,7 +73,7 @@ def main() -> None:
 
     print("\n=== SAMPLE PREVIEW ===")
     try:
-        df = preview_table("automation_operations", limit=5)
+        df = preview_table("bank_accounts", limit=5)
         print(df.head().to_string(index=False))
     except Exception as exc:
         print(f"Preview failed: {exc}\n")
