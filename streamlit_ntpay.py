@@ -9,7 +9,7 @@ from datetime import timedelta
 
 import streamlit as st
 
-from newduck import connect_ducklake
+from newduck import get_connection
 from latest_status_tab import render_latest_status_tab
 from overview_v2_tab import render_overview_v2_tab
 from overview_v3_tab import render_overview_v3_tab
@@ -23,11 +23,8 @@ SQL_PATH = Path(__file__).resolve().with_name("newduckk.sql")
 def get_latest_date(sql):
     """Return the most recent created_at date in the source data, or None."""
     source = sql.strip().rstrip(";")
-    con = connect_ducklake()
-    try:
-        latest = con.execute(f"SELECT MAX(created_at) FROM ({source}) AS source").fetchone()[0]
-    finally:
-        con.close()
+    con = get_connection()
+    latest = con.execute(f"SELECT MAX(created_at) FROM ({source}) AS source").fetchone()[0]
     if latest is None:
         return None
     return latest.date() if hasattr(latest, "date") else latest
@@ -41,16 +38,13 @@ def get_merchant_options(sql, start, end):
     if start is not None and end is not None:
         date_where = "WHERE created_at >= ? AND created_at < ?"
         params = [start, end + timedelta(days=1)]
-    con = connect_ducklake()
-    try:
-        return con.execute(f"""
-            SELECT DISTINCT COALESCE(merchant_category, '(Missing)') AS category,
-                COALESCE(merchant_code, '(Missing)') AS merchant
-            FROM ({source}) AS source {date_where}
-            ORDER BY 1, 2
-        """, params).fetch_df()
-    finally:
-        con.close()
+    con = get_connection()
+    return con.execute(f"""
+        SELECT DISTINCT COALESCE(merchant_category, '(Missing)') AS category,
+            COALESCE(merchant_code, '(Missing)') AS merchant
+        FROM ({source}) AS source {date_where}
+        ORDER BY 1, 2
+    """, params).fetch_df()
 
 
 def merchant_scope_sql(sql, category, merchant):
@@ -130,21 +124,26 @@ def main():
     snapshot = render_shared_filters()
     if snapshot is None:
         return
-    status_tab, overview_v2_tab, overview_v3_tab, deposit_tab, withdrawal_tab = st.tabs(
-        ["Overview", "Overview v2", "Overview v3", "Deposit", "Withdrawal"]
+
+    tab_names = ["Deposit", "Withdrawal", "Overview", "Overview v2", "Overview v3"]
+    selected = st.radio(
+        "View", tab_names, key="active_tab", horizontal=True, label_visibility="collapsed",
     )
-    with status_tab:
-        render_latest_status_tab(snapshot["sql"], snapshot.get("start"), snapshot.get("end"))
-    with overview_v2_tab:
-        render_overview_v2_tab(snapshot["sql"], snapshot.get("start"), snapshot.get("end"))
-    with overview_v3_tab:
-        render_overview_v3_tab(snapshot["sql"], snapshot.get("start"), snapshot.get("end"))
-    with deposit_tab:
+
+    # Render only the selected view so hidden tabs don't run their (expensive,
+    # DuckLake-backed) queries on every rerun.
+    if selected == "Deposit":
         render_overview_v4_tab(snapshot["sql"], snapshot.get("start"), snapshot.get("end"),
                             category=snapshot.get("category"), merchant=snapshot.get("merchant"))
-    with withdrawal_tab:
+    elif selected == "Withdrawal":
         render_withdrawal_tab(snapshot["sql"], snapshot.get("start"), snapshot.get("end"),
                             category=snapshot.get("category"), merchant=snapshot.get("merchant"))
+    elif selected == "Overview":
+        render_latest_status_tab(snapshot["sql"], snapshot.get("start"), snapshot.get("end"))
+    elif selected == "Overview v2":
+        render_overview_v2_tab(snapshot["sql"], snapshot.get("start"), snapshot.get("end"))
+    elif selected == "Overview v3":
+        render_overview_v3_tab(snapshot["sql"], snapshot.get("start"), snapshot.get("end"))
 
 
 if __name__ == "__main__":

@@ -76,6 +76,22 @@ def connect_ducklake(
         ) from None
 
 
+def get_connection() -> duckdb.DuckDBPyConnection:
+    """Cached DuckLake connection, reused across reruns/queries in a session.
+
+    Opening a connection installs extensions and re-attaches the Postgres/S3
+    catalog, which is cheap locally but slow in cloud deployments — caching it
+    avoids paying that cost on every query.
+    """
+    import streamlit as st
+
+    @st.cache_resource(show_spinner=False)
+    def _cached():
+        return connect_ducklake()
+
+    return _cached()
+
+
 def list_ducklake_tables(schema: str = "ingest_ntpay") -> pd.DataFrame:
     """List tables in the selected DuckLake schema."""
     con = connect_ducklake()

@@ -5,7 +5,7 @@ import pandas as pd
 import streamlit as st
 from datetime import timedelta
 
-from newduck import connect_ducklake
+from newduck import get_connection
 
 from latest_status_tab import (
     NPR_TO_USD_RATE, CATEGORY_ORDER, SUCCESS_STATUS, AMOUNT_BUCKET_ORDER, _sort_order,
@@ -315,11 +315,8 @@ def load_withdrawal_overview(sql, start=None, end=None):
         GROUP BY transaction_type, merchant_category, merchant_code, status,
             hour_of_day, amount_bucket
     """
-    con = connect_ducklake()
-    try:
-        leaf = con.execute(query, params).fetch_df()
-    finally:
-        con.close()
+    con = get_connection()
+    leaf = con.execute(query, params).fetch_df()
     keys = ["transaction_type", "merchant_category", "merchant_code", "status"]
     def rollup(dimension):
         return leaf.groupby(keys + [dimension], as_index=False, dropna=False).agg(
@@ -351,11 +348,8 @@ def load_withdrawal_details(sql, start=None, end=None, category=None, merchant=N
         EXTRACT(MINUTE FROM converted_created_at) AS created_minute
         FROM ({source}) AS source
         WHERE {' AND '.join(filters)} ORDER BY created_at DESC NULLS LAST"""
-    con = connect_ducklake()
-    try:
-        return con.execute(query, params).fetch_df()
-    finally:
-        con.close()
+    con = get_connection()
+    return con.execute(query, params).fetch_df()
 
 
 def _withdrawal_details(sql, start, end, category, merchant):

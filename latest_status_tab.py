@@ -8,7 +8,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from newduck import connect_ducklake
+from newduck import get_connection
 
 NPR_TO_USD_RATE = 0.0065
 SUCCESS_STATUS = "success"
@@ -42,11 +42,8 @@ def load_latest_status(sql, start=None, end=None):
         GROUP BY source.transaction_type, source.status, source.merchant_category
         ORDER BY row_count DESC
     """
-    con = connect_ducklake()
-    try:
-        return con.execute(query, params).fetch_df()
-    finally:
-        con.close()
+    con = get_connection()
+    return con.execute(query, params).fetch_df()
 
 
 @st.cache_data(ttl=300, max_entries=4, show_spinner=False)
@@ -67,11 +64,8 @@ def load_merchant_hour_data(sql, start=None, end=None):
         FROM source
         GROUP BY source.transaction_type, source.merchant_category, source.merchant_code, source.status, hour_of_day
     """
-    con = connect_ducklake()
-    try:
-        return con.execute(query, params).fetch_df()
-    finally:
-        con.close()
+    con = get_connection()
+    return con.execute(query, params).fetch_df()
 
 
 @st.cache_data(ttl=300, max_entries=4, show_spinner=False)
@@ -99,11 +93,8 @@ def load_amount_range_data(sql, start=None, end=None):
         FROM source
         GROUP BY source.transaction_type, source.status, source.merchant_category, source.merchant_code, amount_bucket
     """
-    con = connect_ducklake()
-    try:
-        return con.execute(query, params).fetch_df()
-    finally:
-        con.close()
+    con = get_connection()
+    return con.execute(query, params).fetch_df()
 
 
 def _money(value, prefix=""):

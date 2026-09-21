@@ -14,7 +14,8 @@ SELECT
     ao.sender_account_number,
     ao.created_at + INTERVAL '5 hours 45 minutes' AS converted_created_at,
     ao.end_time + INTERVAL '5 hours 45 minutes' AS converted_end_time,
-    -- Duration in seconds; NULL when either timestamp is missing.
+    SUM(ao.fee_amount) AS fee_amount,
+    SUM(ao.amount) AS total_amount,
     date_diff('second', ao.created_at, ao.end_time) AS duration,
     CASE
         WHEN UPPER(TRIM(m.code)) IN (
