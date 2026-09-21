@@ -3,9 +3,49 @@ from pathlib import Path
 import duckdb
 import pandas as pd
 
-DUCKDB_PATH = Path(r"C:\Users\User\Desktop\NTPAY\nera_oc.duckdb")
+DUCKDB_PATH = ":memory:"
 DUCKLAKE_ATTACH = "ducklake:lakehouse"
 DUCKLAKE_ALIAS = "ducklake"
+
+
+def _literal(value) -> str:
+    return "'" + str(value).replace("'", "''") + "'"
+
+
+def _configure_cloud_secrets(con, settings) -> None:
+    """Create connection-scoped secrets; never persist Cloud credentials to disk."""
+    options = {
+        "postgres": ("supabase_pg_secret", {"host", "port", "dbname", "user", "password"}),
+        "s3": ("my_secret", {"key_id", "secret", "region", "endpoint", "url_style", "use_ssl", "session_token", "scope"}),
+    }
+    for kind, (name, allowed) in options.items():
+        values = settings[kind]
+        unknown = set(values) - allowed
+        if unknown:
+            raise ValueError(f"Unsupported options in ducklake.{kind}.")
+        fields = [f"TYPE {kind}"]
+        for key, value in values.items():
+            fields.append(f"{key.upper()} {_literal(value)}")
+        con.execute(f"CREATE OR REPLACE SECRET {name} ({', '.join(fields)})")
+
+    lake = settings["catalog"]
+    con.execute(
+        "CREATE OR REPLACE SECRET lakehouse (TYPE ducklake, "
+        f"METADATA_PATH {_literal(lake.get('metadata_path', ''))}, "
+        f"METADATA_SCHEMA {_literal(lake.get('metadata_schema', 'main'))}, "
+        f"DATA_PATH {_literal(lake['data_path'])}, "
+        "METADATA_PARAMETERS MAP {'TYPE': 'postgres', 'SECRET': 'supabase_pg_secret'})"
+    )
+
+
+def _cloud_settings():
+    import streamlit as st
+    from streamlit.errors import StreamlitSecretNotFoundError
+
+    try:
+        return st.secrets.get("ducklake")
+    except StreamlitSecretNotFoundError:
+        return None
 
 
 def connect_ducklake(
@@ -13,12 +53,27 @@ def connect_ducklake(
 ) -> duckdb.DuckDBPyConnection:
 
     con = duckdb.connect(str(duckdb_path))
-    con.execute("INSTALL ducklake;")
-    con.execute("LOAD ducklake;")
-    con.execute(
-        f"ATTACH IF NOT EXISTS '{DUCKLAKE_ATTACH}' AS {DUCKLAKE_ALIAS} (READ_ONLY);"
-    )
-    return con
+    try:
+        settings = _cloud_settings()
+        extensions = ("ducklake", "postgres", "httpfs") if settings is not None else ("ducklake",)
+        for extension in extensions:
+            con.execute(f"INSTALL {extension};")
+            con.execute(f"LOAD {extension};")
+        if settings is not None:
+            _configure_cloud_secrets(con, settings)
+        con.execute(
+            f"ATTACH IF NOT EXISTS '{DUCKLAKE_ATTACH}' AS {DUCKLAKE_ALIAS} (READ_ONLY);"
+        )
+        return con
+    except Exception:
+        con.close()
+        # Driver errors can contain connection strings; the UI displays this exception.
+        raise RuntimeError(
+            "Could not connect to DuckLake. Check the ducklake PostgreSQL, S3, and "
+            "catalog settings in Streamlit secrets and network access to both services. "
+            "For local use without Streamlit secrets, install the lakehouse and its "
+            "PostgreSQL/S3 secrets in DuckDB."
+        ) from None
 
 
 def list_ducklake_tables(schema: str = "ingest_ntpay") -> pd.DataFrame:
