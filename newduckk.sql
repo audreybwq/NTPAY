@@ -14,8 +14,8 @@ SELECT
     ao.sender_account_number,
     ao.created_at + INTERVAL '5 hours 45 minutes' AS converted_created_at,
     ao.end_time + INTERVAL '5 hours 45 minutes' AS converted_end_time,
-    SUM(ao.fee_amount) AS fee_amount,
-    SUM(ao.amount) AS total_amount,
+    ao.fee_amount AS fee_amount,
+    ao.amount AS total_amount,
     date_diff('second', ao.created_at, ao.end_time) AS duration,
     CASE
         WHEN UPPER(TRIM(m.code)) IN (
